@@ -1,0 +1,35 @@
+[build-system]
+requires = ["setuptools>=65"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcd"
+version = "0.1.0"
+description = "Mahalanobis Concept Drift Detector for multilingual customer support tickets"
+readme = "README.md"
+license = { file = "LICENSE" }
+authors = [{ name = "Valery Shabashev" }]
+requires-python = ">=3.11"
+
+dependencies = [
+  "numpy>=1.24",
+  "pandas>=1.5",
+  "scikit-learn>=1.3",
+  "joblib>=1.3",
+  "sentence-transformers>=2.2",
+  "streamlit>=1.30",
+  "matplotlib>=3.7",
+]
+
+[project.urls]
+Repository = "https://github.com/sha-bash/mahalanobis-concept-drift"
+Documentation = "docs/"
+
+[project.scripts]
+mcd = "mcd.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -1,0 +1,29 @@
+cff-version: 1.2.0
+title: "Mahalanobis Concept Drift Detector"
+message: >
+  If you use this software in academic work, please cite it as follows.
+type: software
+
+authors:
+  - family-names: "Шабашев"
+    given-names: "Валерий Олегович"
+
+version: "0.1.0"
+date-released: 2026-01-01
+
+abstract: >
+  Программный комплекс для классификации текстовых данных и обнаружения
+  концептуального дрейфа на основе многомодальной метрики Махаланобиса
+  в пространстве эмбеддингов трансформерных моделей.
+
+keywords:
+  - concept drift
+  - Mahalanobis distance
+  - NLP
+  - embeddings
+  - customer support
+  - anomaly detection
+
+license: "Proprietary"
+
+repository-code: ""

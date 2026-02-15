@@ -1,0 +1,12 @@
+# Core numerical stack
+numpy>=1.24
+pandas>=1.5
+scikit-learn>=1.3
+joblib>=1.3
+
+# Embeddings
+sentence-transformers>=2.2
+
+# Web demo (Streamlit UI)
+streamlit>=1.30
+matplotlib>=3.7
