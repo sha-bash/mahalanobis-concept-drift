@@ -1,14 +1,24 @@
-import numpy as np
-from typing import List, Dict, Tuple
 import logging
+from typing import Dict, List, Tuple
+
+import numpy as np
+
 from src.mcd.embedding.sbert import SBERT
 from src.mcd.modeling.covariance import estimate_covariance, invert_covariance
 from src.mcd.modeling.drift import detect_drift
+from src.mcd.modeling.thresholds import QuantileThresholdStrategy, ThresholdStrategy
 
 logger = logging.getLogger(__name__)
 
+
 class MahalanobisDriftDetector:
-    def __init__(self, embedder=None, threshold_quantile: float = 0.99, min_cluster_size: int = 10):
+    def __init__(
+        self,
+        embedder=None,
+        threshold_quantile: float = 0.99,
+        min_cluster_size: int = 10,
+        threshold_strategy: ThresholdStrategy | None = None,
+    ) -> None:
         self.embedder = embedder or SBERT()
         self.label_to_index: Dict[str, int] = {}
         self.index_to_label: Dict[int, str] = {}
@@ -18,6 +28,10 @@ class MahalanobisDriftDetector:
         self.regularization = 1e-6
         self.threshold_quantile = threshold_quantile
         self.min_cluster_size = min_cluster_size
+        # Use provided strategy or default to empirical quantile based on threshold_quantile
+        self.threshold_strategy: ThresholdStrategy = threshold_strategy or QuantileThresholdStrategy(
+            quantile=threshold_quantile
+        )
 
     def fit(self, texts: List[str], labels: List[str]) -> None:
         """Fit the model on labeled texts."""
@@ -38,21 +52,22 @@ class MahalanobisDriftDetector:
                 logger.warning(f"Skipping cluster {unique_labels[i]} with size {len(cluster_texts)} < {self.min_cluster_size}")
                 continue
             cluster_embeddings = self.embedder.embed(cluster_texts)
-            
+
             mean = np.mean(cluster_embeddings, axis=0)
             self.cluster_means.append(mean)
-            
+
             cov = estimate_covariance(cluster_embeddings, self.regularization)
             self.cluster_covs.append(cov)
-            
+
             distances = []
             for emb in cluster_embeddings:
                 diff = emb - mean
                 inv_cov = invert_covariance(cov, self.regularization)
                 dist = np.sqrt(diff.T @ inv_cov @ diff)
                 distances.append(dist)
-            
-            threshold = np.quantile(distances, self.threshold_quantile)
+
+            feature_dim = cluster_embeddings.shape[1]
+            threshold = self.threshold_strategy.compute(distances, feature_dim=feature_dim)
             self.thresholds.append(threshold)
 
         logger.info(f"Fitted model with {len(self.cluster_means)} clusters")
@@ -124,8 +139,8 @@ class MahalanobisDriftDetector:
         data = load_artifact(path)
         mapping_path = path.replace('.joblib', '_mapping.json')
         label_to_index = load_label_mapping(mapping_path)
-        
-        instance = cls()
+
+        instance = cls(threshold_quantile=data.get('threshold_quantile', 0.99))
         instance.label_to_index = label_to_index
         instance.index_to_label = {v: k for k, v in label_to_index.items()}
         instance.cluster_means = data['cluster_means']
