@@ -12,5 +12,8 @@ Invoice wrong,Total on invoice does not match cart,billing
 Card declined,Valid card shows declined at payment step,billing
 Two factor error,Authenticator codes always rejected,account
 Session timeout,Logged out every few minutes,account
+Password reset email missing,I use forgot password but no email arrives in inbox,account
+No reset mail,Clicked reset password link several times still no message,account
+Forgot password inbox empty,Never receive the password reset email after request,account
 Blank screen,Main dashboard shows only white screen,technical
 Export failed,Cannot export report to PDF,technical
