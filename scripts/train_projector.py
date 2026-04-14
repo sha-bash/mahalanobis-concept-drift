@@ -65,13 +65,12 @@ def triplet_loss_step(
 
     if not anc_list:
         return None
+    anc = torch.stack(anc_list)
+    pos = torch.stack(pos_list)
+    neg = torch.stack(neg_list)
     return cast(
         torch.Tensor,
-        criterion(
-            torch.stack(anc_list),
-            torch.stack(pos_list),
-            torch.stack(neg_list),
-        ),
+        criterion(model(anc), model(pos), model(neg)),
     )
 
 

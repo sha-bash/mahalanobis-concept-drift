@@ -150,7 +150,22 @@ subject,body,queue
 
 ---
 
-## 5. Быстрый старт (CLI)
+## 5. Демо-стенд с проектором (Streamlit)
+
+Из корня репозитория, с установленным PyTorch (`pip install -e ".[train]"`):
+
+```bash
+python scripts/run_demo_stand_with_projector.py
+streamlit run src/mcd/app_streamlit.py
+```
+
+В боковой панели выберите **Load from disk** и путь `models/demo_stand/demo_model.joblib` (рядом автоматически лежат веса проектора — их подхватит `load()`).
+
+Скрипт по умолчанию использует [data/demo_labeled.csv](data/demo_labeled.csv). Свой CSV: те же колонки `subject`, `body` и колонка меток (например `queue`). Повторный прогон без переобучения проектора: `python scripts/run_demo_stand_with_projector.py --skip-projector-train`.
+
+---
+
+## 6. Быстрый старт (CLI)
 
 ```bash
 # Обучение
@@ -164,6 +179,6 @@ python -m mcd.cli predict --model-file models/model.joblib --text "Текст о
 
 ---
 
-## 6. Лицензия и репозиторий
+## 7. Лицензия и репозиторий
 
 См. файл [LICENSE](LICENSE) и метаданные в [pyproject.toml](pyproject.toml) (ссылка на репозиторий в `[project.urls]`).

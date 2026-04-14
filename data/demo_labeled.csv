@@ -1,0 +1,16 @@
+subject,body,queue
+Payment error,Cannot complete checkout with my card,billing
+Double charge,I was charged twice for the same order,billing
+Refund pending,Still waiting for my refund after 10 days,billing
+Login failure,Cannot sign in after password reset,account
+Account locked,My account is blocked without reason,account
+Profile update,Unable to change email on my profile,account
+App crash,Application closes immediately on startup,technical
+Slow search,Search takes over a minute to return results,technical
+Sync issue,Calendar does not sync with mobile device,technical
+Invoice wrong,Total on invoice does not match cart,billing
+Card declined,Valid card shows declined at payment step,billing
+Two factor error,Authenticator codes always rejected,account
+Session timeout,Logged out every few minutes,account
+Blank screen,Main dashboard shows only white screen,technical
+Export failed,Cannot export report to PDF,technical
