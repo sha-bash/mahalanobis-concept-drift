@@ -28,6 +28,22 @@ $$
 
 ---
 
+## 2.1. Опциональная проекция эмбеддингов
+
+Для повышения устойчивости оценок в высокой размерности вводится обучаемое отображение
+$g_\theta: \mathbb{R}^d \to \mathbb{R}^{d'}$, где $d' \ll d$:
+
+$$
+\tilde{\mathbf{z}}_i = g_\theta(\mathbf{z}_i)
+$$
+
+Если проектор не используется, полагают $\tilde{\mathbf{z}}_i = \mathbf{z}_i$.
+Все последующие шаги (центры кластеров, ковариации, пороги, расстояния Махаланобиса)
+выполняются в пространстве векторов $\tilde{\mathbf{z}}$.
+Параметры $\theta$ подбираются отдельно (например, методом triplet margin на размеченной выборке).
+
+---
+
 ## 3. Модель нормы
 
 ### Средний вектор
@@ -36,7 +52,7 @@ $$
 \boldsymbol{\mu}_k =
 \frac{1}{N_k}
 \sum_{i: y_i = k}
-\mathbf{z}_i
+\tilde{\mathbf{z}}_i
 $$
 
 ### Ковариационная матрица
@@ -45,26 +61,28 @@ $$
 \Sigma_k =
 \frac{1}{N_k - 1}
 \sum_{i: y_i = k}
-(\mathbf{z}_i - \boldsymbol{\mu}_k)
-(\mathbf{z}_i - \boldsymbol{\mu}_k)^T
+(\tilde{\mathbf{z}}_i - \boldsymbol{\mu}_k)
+(\tilde{\mathbf{z}}_i - \boldsymbol{\mu}_k)^T
 $$
 
 Регуляризация:
 
 $$
-\Sigma_k^{*} = \Sigma_k + \lambda I_d
+\Sigma_k^{*} = \Sigma_k + \lambda I_{d'}
 $$
+
+где $d'$ — размерность векторов $\tilde{\mathbf{z}}$; при отсутствии проектора $d' = d$.
 
 ---
 
 ## 4. Расстояние Махаланобиса
 
 $$
-d_k(\mathbf{z}) =
+d_k(\tilde{\mathbf{z}}) =
 \sqrt{
-(\mathbf{z} - \boldsymbol{\mu}_k)^T
+(\tilde{\mathbf{z}} - \boldsymbol{\mu}_k)^T
 (\Sigma_k^{*})^{-1}
-(\mathbf{z} - \boldsymbol{\mu}_k)
+(\tilde{\mathbf{z}} - \boldsymbol{\mu}_k)
 }
 $$
 
@@ -73,19 +91,22 @@ $$
 ## 5. Классификация
 
 $$
-k^* = \arg\min_k d_k(\mathbf{z})
+k^* = \arg\min_k d_k(\tilde{\mathbf{z}})
 $$
 
 $$
-d_{\min} = d_{k^*}(\mathbf{z})
+d_{\min} = d_{k^*}(\tilde{\mathbf{z}})
 $$
 
 ---
 
 ## 6. Порог
 
+Порог для кластера $k$ задаётся как эмпирический квантиль (или иная стратегия из реализации)
+набора внутрикластерных расстояний $\{ d_k(\tilde{\mathbf{z}}_i) \mid y_i = k \}$:
+
 $$
-\tau_k = Q_q(d_k(\mathbf{z}_i))
+\tau_k = Q_q\bigl(\{ d_k(\tilde{\mathbf{z}}_i) \}_{i:\, y_i = k}\bigr)
 $$
 
 ---

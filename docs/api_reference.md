@@ -47,6 +47,9 @@ python -m mcd.cli fit \
 
 - Модель сохраняется в формате `.joblib` по пути `--model-file`
 - Маппинг меток сохраняется в JSON (в соседнем файле с префиксом `_mapping`)
+- При использовании обучаемого проектора через Python API рядом с моделью дополнительно сохраняются файлы `{stem}_projector.pt` и `{stem}_projector_config.json` (см. раздел 2.1)
+
+**Примечание:** команда `fit` в CLI создаёт детектор без нейросетевого проектора. Подключение `DeepMahalanobisProjector` выполняется из Python-кода (см. раздел 2.1 и скрипт обучения проектора).
 
 ---
 
@@ -153,15 +156,21 @@ from src.mcd.modeling.classifier import MahalanobisDriftDetector
 MahalanobisDriftDetector(
     embedder=None,
     threshold_quantile: float = 0.99,
-    min_cluster_size: int = 10
+    min_cluster_size: int = 10,
+    threshold_strategy: ThresholdStrategy | None = None,
+    projector: nn.Module | None = None,
+    projector_batch_size: int = 512,
 )
 ```
 
 **Параметры:**
 
 - `embedder`: объект класса `Embedder` (по умолчанию — `SBERT`)
-- `threshold_quantile`: квантиль для расчёта порогов (0.0-1.0)
+- `threshold_quantile`: квантиль для расчёта порогов (0.0-1.0), используется если не задана своя `threshold_strategy`
 - `min_cluster_size`: минимальный размер кластера для включения в модель
+- `threshold_strategy`: стратегия порога (`QuantileThresholdStrategy`, `ChiSquareThresholdStrategy` и др. из `src.mcd.modeling.thresholds`); по умолчанию — квантильная с параметром `threshold_quantile`
+- `projector`: необязательный PyTorch-модуль (рекомендуется `DeepMahalanobisProjector` из `src.mcd.projection`); отображает эмбеддинги SBERT в пространство меньшей размерности перед расчётом Махаланобиса. Требуется установленный пакет `torch` (`pip install .[train]`)
+- `projector_batch_size`: размер батча при применении проектора к матрице эмбеддингов (экономия памяти)
 
 ---
 
@@ -180,12 +189,13 @@ def fit(texts: List[str], labels: List[str]) -> None
 
 **Процесс:**
 
-1. Вычисляет SBERT-эмбеддинги для всех текстов
-2. Для каждого кластера:
-   - Вычисляет среднее (mean) и ковариацию
-   - Расчитывает пороговое значение как `quantile` расстояний Махаланобиса внутри кластера
+1. Один раз вычисляет эмбеддинги для всех текстов через `embedder.embed(texts)`
+2. При заданном `projector` — проецирует матрицу эмбеддингов в меньшую размерность (режим `eval`, без градиентов, батчами)
+3. Для каждого кластера по меткам (без повторного вызова эмбеддера):
+   - вычисляет среднее (mean) и ковариационную матрицу в **том же** пространстве (сырые или спроецированные эмбеддинги)
+   - рассчитывает порог через `threshold_strategy` (например, квантиль расстояний Махаланобиса внутри кластера; размерность признака `feature_dim` соответствует размерности векторов после проекции)
 
-**Пример:**
+**Пример без проектора:**
 
 ```python
 detector = MahalanobisDriftDetector(threshold_quantile=0.99)
@@ -193,6 +203,24 @@ detector.fit(
     texts=["Это текст 1", "Это текст 2", ...],
     labels=["billing", "billing", "technical", ...]
 )
+```
+
+**Пример с обученным проектором:**
+
+```python
+import json
+import torch
+from src.mcd.projection.projector import DeepMahalanobisProjector
+
+with open("models/my_projector_config.json", encoding="utf-8") as f:
+    cfg = json.load(f)
+cfg.pop("schema", None)
+proj = DeepMahalanobisProjector.from_architecture_dict(cfg)
+proj.load_state_dict(torch.load("models/my_projector.pt", map_location="cpu"))
+proj.eval()
+
+detector = MahalanobisDriftDetector(threshold_quantile=0.99, projector=proj)
+detector.fit(texts, labels)
 ```
 
 ---
@@ -233,7 +261,7 @@ print(f"Label: {label}, Drift: {is_drift}")
 def predict_batch(texts: List[str]) -> List[Tuple[str, float, float, bool]]
 ```
 
-**Назначение:** Предсказание для списка текстов (оптимизировано с кэшированием эмбеддингов).
+**Назначение:** Предсказание для списка текстов (один вызов `embed` на весь список, затем при необходимости проекция).
 
 **Параметры:**
 
@@ -258,6 +286,19 @@ def load(path: str) -> MahalanobisDriftDetector
 
 - `path` (str): Путь к файлу модели (`.joblib`)
 
+**Файлы на диске:**
+
+| Файл | Содержимое |
+|------|------------|
+| `{path}` | Словарь joblib: центры кластеров, ковариации, пороги, метаданные (`has_projector`, `projector_batch_size` и др.) |
+| `{path с заменой .joblib на _mapping.json}` | JSON: отображение метка → индекс |
+| `{stem}_projector.pt` | `state_dict` PyTorch (только если при сохранении был задан `projector`) |
+| `{stem}_projector_config.json` | Архитектура сети: `input_dim`, `hidden_dims`, `output_dim`, `dropout`, опционально `schema` |
+
+Здесь `stem` — имя файла без расширения, например для `models/foo.joblib` это `foo_projector.pt` и `foo_projector_config.json`.
+
+При загрузке: если оба файла проектора присутствуют, детектор восстанавливает `DeepMahalanobisProjector` и веса; если их нет — поведение как у классической модели без проекции. Несоответствие (есть только один из двух файлов проектора) приводит к ошибке с пояснением.
+
 **Пример:**
 
 ```python
@@ -270,7 +311,55 @@ loaded_detector = MahalanobisDriftDetector.load("models/my_model.joblib")
 
 ---
 
-### 2.2 Модуль `io`
+### 2.2 Модуль `projection` и обучение проектора
+
+**Класс `DeepMahalanobisProjector`**
+
+```python
+from src.mcd.projection import DeepMahalanobisProjector
+
+model = DeepMahalanobisProjector(
+    input_dim=384,
+    hidden_dims=[256, 128],
+    output_dim=64,
+    dropout=0.1,
+)
+```
+
+MLP: линейные слои, `BatchNorm1d`, `GELU`, `Dropout`, финальный линейный слой в `output_dim`.
+
+Вспомогательные методы:
+
+- `architecture_dict()` — словарь для JSON;
+- `from_architecture_dict(cfg)` — восстановление экземпляра по сохранённому JSON;
+- `forward(x: Tensor) -> Tensor` — прямой проход.
+
+**Скрипт `scripts/train_projector.py`**
+
+Обучение проектора на размеченном CSV (те же колонки, что и для детектора: `subject`, `body`, колонка меток). Используются эмбеддинги SBERT и функция потерь `TripletMarginLoss` (сближение векторов одного кластера, отдаление разных).
+
+Требуется: `pip install .[train]` (или установленный `torch`).
+
+```bash
+python scripts/train_projector.py \
+  --csv data/sample_labeled.csv \
+  --label-column queue \
+  --output models/projector.pt \
+  --epochs 20 \
+  --batch-size 128 \
+  --lr 0.001 \
+  --hidden-dims 256,128 \
+  --output-dim 64 \
+  --sbert-model all-MiniLM-L6-v2
+```
+
+По умолчанию конфиг архитектуры пишется в `projector_config.json` (рядом с `projector.pt`), либо путь задаётся через `--config-out`.
+
+Основные аргументы: `--csv`, `--label-column`, `--output`, `--config-out`, `--sbert-model`, `--embed-batch-size`, `--epochs`, `--batch-size`, `--lr`, `--hidden-dims`, `--output-dim`, `--dropout`, `--margin`, `--seed`, `--device`, `-v`.
+
+---
+
+### 2.3 Модуль `io`
 
 **Функция `load_labeled_tickets_csv()`**
 
@@ -297,7 +386,7 @@ csv_path, selected_csv_name = resolve_dataset_path("data/archive.zip")
 
 ---
 
-### 2.3 Модуль `embedding`
+### 2.4 Модуль `embedding`
 
 **Класс `SBERT`**
 
@@ -312,7 +401,7 @@ embeddings = embedder.embed(["text1", "text2"])
 
 ---
 
-### 2.4 Модуль `visualization`
+### 2.5 Модуль `visualization`
 
 **Функция `project_2d()`**
 
@@ -396,4 +485,33 @@ label, dist, thresh, is_drift = detector.predict("New ticket text")
 
 # Сохранить
 detector.save("models/trained.joblib")
+```
+
+### Workflow 5: обучение проектора и детектора с проекцией
+
+```bash
+pip install -e ".[train]"
+python scripts/train_projector.py --csv data.csv --label-column queue --output models/projector.pt
+```
+
+По умолчанию рядом создаётся `models/projector_config.json`.
+
+```python
+import json
+import torch
+from src.mcd.modeling.classifier import MahalanobisDriftDetector
+from src.mcd.io import load_labeled_tickets_csv
+from src.mcd.projection.projector import DeepMahalanobisProjector
+
+texts, labels, _, _ = load_labeled_tickets_csv("data.csv", "queue")
+with open("models/projector_config.json", encoding="utf-8") as f:
+    cfg = json.load(f)
+cfg.pop("schema", None)
+proj = DeepMahalanobisProjector.from_architecture_dict(cfg)
+proj.load_state_dict(torch.load("models/projector.pt", map_location="cpu"))
+proj.eval()
+
+detector = MahalanobisDriftDetector(projector=proj)
+detector.fit(texts, labels)
+detector.save("models/with_projector.joblib")
 ```
