@@ -10,6 +10,7 @@ from numpy.typing import NDArray
 
 from src.mcd.embedding.sbert import SBERT
 from src.mcd.modeling.covariance import estimate_covariance, invert_covariance
+from src.mcd.preprocessing import normalize_ticket_input, preprocess_text
 from src.mcd.modeling.drift import detect_drift
 from src.mcd.modeling.thresholds import QuantileThresholdStrategy, ThresholdStrategy
 
@@ -40,6 +41,7 @@ class MahalanobisDriftDetector:
         threshold_strategy: ThresholdStrategy | None = None,
         projector: nn.Module | None = None,
         projector_batch_size: int = _DEFAULT_PROJECT_BATCH,
+        regularization: float = 1e-6,
     ) -> None:
         self.embedder = embedder or SBERT()
         self.label_to_index: Dict[str, int] = {}
@@ -47,7 +49,7 @@ class MahalanobisDriftDetector:
         self.cluster_means: List[NDArray[np.float64]] = []
         self.cluster_covs: List[NDArray[np.float64]] = []
         self.thresholds: List[float] = []
-        self.regularization = 1e-6
+        self.regularization = float(regularization)
         self.threshold_quantile = threshold_quantile
         self.min_cluster_size = min_cluster_size
         self.threshold_strategy: ThresholdStrategy = threshold_strategy or QuantileThresholdStrategy(
@@ -119,6 +121,7 @@ class MahalanobisDriftDetector:
 
     def predict(self, text: str) -> Tuple[str, float, float, bool]:
         """Predict cluster and detect drift for a single text."""
+        text = preprocess_text(normalize_ticket_input(text))
         embedding = self.embedder.embed([text])
         embedding = self._project_numpy_embeddings(embedding)[0]
 
@@ -141,7 +144,8 @@ class MahalanobisDriftDetector:
 
     def predict_batch(self, texts: List[str]) -> List[Tuple[str, float, float, bool]]:
         """Predict batch of texts."""
-        embeddings = self.embedder.embed(texts)
+        cleaned = [preprocess_text(normalize_ticket_input(t)) for t in texts]
+        embeddings = self.embedder.embed(cleaned)
         embeddings = self._project_numpy_embeddings(embeddings)
         results = []
         for embedding in embeddings:
@@ -215,6 +219,7 @@ class MahalanobisDriftDetector:
         instance = cls(
             threshold_quantile=data.get("threshold_quantile", 0.99),
             min_cluster_size=data.get("min_cluster_size", 10),
+            regularization=float(data.get("regularization", 1e-6)),
         )
         instance.label_to_index = label_to_index
         instance.index_to_label = {v: k for k, v in label_to_index.items()}

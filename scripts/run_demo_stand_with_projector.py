@@ -44,8 +44,14 @@ def main() -> None:
     parser.add_argument(
         "--threshold-quantile",
         type=float,
-        default=0.95,
-        help="Квантиль порога детектора (мало данных — лучше не 0.99)",
+        default=1.0,
+        help="Квантиль по внутрикластерным расстояниям; 1.0 = max (разумно при n≪d в демо).",
+    )
+    parser.add_argument(
+        "--regularization",
+        type=float,
+        default=1.0,
+        help="Диагональная регуляризация ковариации (1e-6 мало при малом n и dim=32 после проектора).",
     )
     parser.add_argument("--min-cluster-size", type=int, default=3)
     args = parser.parse_args()
@@ -112,6 +118,7 @@ def main() -> None:
         threshold_quantile=args.threshold_quantile,
         min_cluster_size=args.min_cluster_size,
         projector=projector,
+        regularization=args.regularization,
     )
     detector.fit(texts, labels)
     detector.save(str(model_joblib))

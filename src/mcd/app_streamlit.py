@@ -73,7 +73,7 @@ def main() -> None:
         else:  # Train Model
             st.subheader("Training Parameters")
             label_col = st.selectbox("Label Column", ["queue", "tag_1"])
-            threshold_q = st.slider("Threshold Quantile", 0.90, 0.99, 0.99, 0.01)
+            threshold_q = st.slider("Threshold Quantile", 0.90, 1.0, 0.99, 0.01)
             min_size = st.number_input("Min Cluster Size", 1, 50, 10)
             seed_val = st.number_input("Seed", 0, 1000, 42)
 

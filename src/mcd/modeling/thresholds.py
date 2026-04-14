@@ -23,14 +23,17 @@ class QuantileThresholdStrategy:
     quantile: float = 0.95
 
     def compute(self, distances: NDArray[np.float64] | Sequence[float], *, feature_dim: int) -> float:
-        if not 0.0 < self.quantile < 1.0:
-            raise ValueError(f"quantile must be in (0, 1), got {self.quantile}")
+        if not 0.0 < self.quantile <= 1.0:
+            raise ValueError(f"quantile must be in (0, 1], got {self.quantile}")
 
         arr = np.asarray(distances, dtype=float)
         if arr.ndim != 1:
             raise ValueError("distances must be a 1D array")
         if arr.size == 0:
             raise ValueError("distances must not be empty")
+
+        if self.quantile == 1.0:
+            return float(np.max(arr))
 
         return float(np.quantile(arr, self.quantile))
 

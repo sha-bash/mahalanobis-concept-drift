@@ -15,6 +15,12 @@ def test_quantile_threshold_monotonic_in_quantile() -> None:
     assert low <= high
 
 
+def test_quantile_threshold_one_is_max() -> None:
+    distances = np.array([0.1, 0.5, 2.0, 0.3], dtype=float)
+    threshold = QuantileThresholdStrategy(quantile=1.0).compute(distances, feature_dim=1)
+    assert threshold == 2.0
+
+
 def test_quantile_threshold_approximates_fraction_of_points() -> None:
     rng = np.random.default_rng(seed=42)
     distances = rng.normal(loc=0.0, scale=1.0, size=10_000)
