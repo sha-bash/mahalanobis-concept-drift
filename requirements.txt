@@ -1,3 +1,5 @@
+# Python >=3.11 (see pyproject.toml)
+
 # Core numerical stack
 numpy>=1.24
 pandas>=1.5
@@ -12,5 +14,10 @@ sentence-transformers>=2.2
 streamlit>=1.30
 matplotlib>=3.7
 
-# Testing
-pytest>=8.0
+# PyTorch — DeepMahalanobisProjector, scripts/train_projector.py, save/load projector weights
+# (optional extra in pyproject: pip install -e ".[train]")
+torch>=2.1
+
+# Testing & static typing (optional extra: pip install -e ".[dev]")
+pytest>=7.0
+mypy>=1.8
